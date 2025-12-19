@@ -68,15 +68,21 @@ export const policyEvaluate = inngest.createFunction(
         Your task is to go through the policy text and find the relevant sections that answer the user question.
         which are in User questions and specific document query.
 
-        Rules:
-        - Use only the provided policy text
-        - Respond in JSON format with the following structure bcz your response will be parsed:
-          {
-            "status": "APPROVED" | "REJECTED" | "ACTION_REQUIRED",
-            "explanation": "detailed reasoning",
-            "relevant_sections": ["section 1", "section 2"], or chunks or lines anything which You referred to give your response
-            "recommendation": "your recommendation",
-          }
+        OUTPUT RULES (VERY IMPORTANT):
+        - Return ONLY a valid JSON object
+        - Do NOT wrap the response in markdown
+        - Do NOT use \`\`\`
+        - Do NOT add explanations outside JSON
+        - The response MUST be directly parseable by JSON.parse()
+
+        JSON SCHEMA:
+        {
+          "status": "APPROVED" | "REJECTED" | "ACTION_REQUIRED",
+          "explanation": "string",
+          "relevant_sections": ["string"],
+          "recommendation": "string",
+          "confidence_score": number
+        }
        
         Give your recommendation in plain-simple english and which directly states the result, just like a bank manager would explain it to a customer.
         `;
@@ -134,7 +140,7 @@ export const policyEvaluate = inngest.createFunction(
           throw error;
         }
       });
-
+      console.log(finalResult);
       return finalResult;
     } else {
       // When conv != "0", this is a follow-up conversation

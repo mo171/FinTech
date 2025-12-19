@@ -1,47 +1,48 @@
 import { evaluate } from "../services/policy.service.js";
 import { supabaseAdmin } from "../utils/supabase.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 /**
  * Controller to handle policy evaluation requests
  * Delegates business logic to the service layer
  */
-const evaluateRequest = async (req, res) => {
+const evaluateRequest = asyncHandler(async (req, res) => {
   try {
     const { type, query, documentQuery, conv } = req.body;
-    if (conv == "0") {
-      if (!type || !query) {
-        return res.status(400).json({
-          error: "Missing required fields: type and query are required",
-        });
-      }
 
-      // Delegate to service layer for evaluation logic
-      const result = await evaluate(
-        type,
-        query,
-        documentQuery,
-        req.user.id,
-        conv,
-      );
-
-      return res.status(200).json({
-        message: "Policy evaluation in progress",
-        ...result,
-      });
-    } else {
-      // Handle follow-up conversation (conv != "0")
-      return res.status(200).json({
-        message: "Follow-up conversation not yet implemented",
-        conv,
+    // Basic validation
+    if (!type || !query) {
+      return res.status(400).json({
+        error: "Missing required fields: type and query are required",
       });
     }
+
+    // Delegate to service layer for evaluation logic (handles initial and follow-ups)
+    const result = await evaluate(
+      type,
+      query,
+      documentQuery,
+      req.user.id,
+      conv,
+    );
+
+    return res
+      .status(200)
+      .json(
+        new ApiResponse(
+          200,
+          result,
+          "Policy evaluation completed successfully",
+        ),
+      );
   } catch (error) {
     console.error("Error in evaluateRequest controller:", error);
     return res.status(500).json({
       error: error.message || "Failed to initiate policy evaluation",
     });
   }
-};
+});
 
 /**
  * Controller to retrieve the latest evaluation result for the authenticated user
