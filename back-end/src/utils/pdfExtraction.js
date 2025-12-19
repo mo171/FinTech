@@ -2,5 +2,10 @@ import pdf from "pdf-parse";
 
 export const extractTextFromPDF = async (buffer) => {
   const data = await pdf(buffer);
-  return data.text;
+  const text = data.text;
+  return text
+    .replace(/\n{2,}/g, "\n")
+    .replace(/\s+/g, " ")
+    .replace(/Page \d+/gi, "")
+    .trim();
 };

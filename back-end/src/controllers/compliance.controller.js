@@ -7,22 +7,34 @@ import { supabaseAdmin } from "../utils/supabase.js";
  */
 const evaluateRequest = async (req, res) => {
   try {
-    const { type, query, documentQuery } = req.body;
+    const { type, query, documentQuery, conv } = req.body;
+    if (conv == "0") {
+      if (!type || !query) {
+        return res.status(400).json({
+          error: "Missing required fields: type and query are required",
+        });
+      }
 
-    // Validate required fields
-    if (!type || !query) {
-      return res.status(400).json({
-        error: "Missing required fields: type and query are required",
+      // Delegate to service layer for evaluation logic
+      const result = await evaluate(
+        type,
+        query,
+        documentQuery,
+        req.user.id,
+        conv,
+      );
+
+      return res.status(200).json({
+        message: "Policy evaluation in progress",
+        ...result,
+      });
+    } else {
+      // Handle follow-up conversation (conv != "0")
+      return res.status(200).json({
+        message: "Follow-up conversation not yet implemented",
+        conv,
       });
     }
-
-    // Delegate to service layer for evaluation logic
-    const result = await evaluate(type, query, documentQuery, req.user.id);
-
-    return res.status(200).json({
-      message: "Policy evaluation in progress",
-      ...result,
-    });
   } catch (error) {
     console.error("Error in evaluateRequest controller:", error);
     return res.status(500).json({
