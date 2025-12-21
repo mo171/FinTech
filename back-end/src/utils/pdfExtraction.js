@@ -1,3 +1,7 @@
+/* 
+  - TAKES PDF-URL FROM DATA-BASE
+  - PROCCESS THE PDF AND GIVES TEXT
+*/
 import pdf from "pdf-parse";
 
 export const extractTextFromPDF = async (buffer) => {

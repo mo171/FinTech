@@ -8,3 +8,9 @@ export const DecisionSchema = z.object({
   response: z.string(),
   responseforfurtherllm: z.string(),
 });
+
+export const ExtractionSchema = z.object({
+  type: z.string().nullable(),
+  query: z.string(),
+  conv: z.string().default("0"),
+});

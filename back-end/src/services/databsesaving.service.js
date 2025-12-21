@@ -16,6 +16,17 @@ export const createConversation = async (userId, policy) => {
   return data;
 };
 
+export const getConversation = async (conversationId) => {
+  const { data, error } = await supabaseAdmin
+    .from("conversations")
+    .select("*")
+    .eq("id", conversationId)
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
 export const saveMessage = async ({ conversationId, role, content }) => {
   const { error } = await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
@@ -28,17 +39,14 @@ export const saveMessage = async ({ conversationId, role, content }) => {
 
 export const getStoredPolicyText = async (policyId) => {
   const { data, error } = await supabaseAdmin
-    .from("policy_documents_text")
-    .select("raw_text")
+    .from("policy_chunks")
+    .select("content")
     .eq("policy_id", policyId)
-    .single();
+    .limit(1);
 
-  if (error && error.code !== "PGRST116") {
-    // PGRST116 = no rows found
-    throw error;
-  }
+  if (error) throw error;
 
-  return data?.raw_text || null;
+  return data.length > 0 ? data[0].content : null;
 };
 
 export const storePolicyText = async (policy, rawText) => {

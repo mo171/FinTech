@@ -1,43 +1,35 @@
-// import { GoogleGenerativeAI } from "@google/generative-ai";
-// import dotenv from "dotenv";
 
-// dotenv.config({ path: "./.env" });
-
-// const genAI = new GoogleGenerativeAI(process.env.LLM_API_KEY);
-
-// export const askLLM = async (prompt) => {
-//   try {
-//     const model = genAI.getGenerativeModel({
-//       model: "gemini-pro", // ✅ WORKING MODEL
-//     });
-
-//     const result = await model.generateContent(prompt);
-//     return result.response.text();
-//   } catch (error) {
-//     console.error("Gemini error:", error);
-//     throw new Error(`Failed to get LLM response: ${error.message}`);
-//   }
-// };
-
-
+// ---------------------------------------> OPEN A.I AND DEEPSEEK <-----------------------------------------
+/*
+  - THIS IS THE LLM RESPONSE MODULE
+  - BASIC CONFIG TO TO LLM
+  - PROMPT AND REPLY DONE HERE
+*/
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
-dotenv.config({
-  path: "./.env",
-});
+dotenv.config({ path: "./.env" });
 
-
-const client = new OpenAI({
-  apiKey: process.env.LLM_API_KEY
+const openai = new OpenAI({
+  baseURL: "https://api.deepseek.com",
+  apiKey: process.env.DEEPSEEK_API_KEY,
 });
 
 export const askLLM = async (prompt) => {
-  const response = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0
-  });
+  try {
+    const response = await openai.chat.completions.create({
+      model: "deepseek-chat",
+      max_tokens: 4096,
+      messages: [{ role: "system", content: prompt }],
+    });
 
-  return response.choices[0].message.content;
+    if (response.choices[0].message.content) {
+      return response.choices[0].message.content;
+    }
+
+    throw new Error("Empty response from deepseek");
+  } catch (error) {
+    console.error("deepseek error:", error);
+    throw new Error(`Failed to get LLM response: ${error.message}`);
+  }
 };
