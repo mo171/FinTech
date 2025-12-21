@@ -5,7 +5,7 @@ import { UserContext } from "../context/UserContext";
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { user, setUser } = useContext(UserContext);
+  const { user, setUser, loading } = useContext(UserContext);
   const supabase = createClient();
 
   const handleLogout = async () => {
@@ -54,13 +54,21 @@ const Navbar = () => {
           <Link to="/" style={{ color: "var(--text-muted)", fontWeight: 500 }}>
             Home
           </Link>
-          {user ? (
+          {loading ? (
+            <span className="text-xs text-text-muted">Loading...</span>
+          ) : user ? (
             <>
               <Link
                 to="/kyc"
                 style={{ color: "var(--text-muted)", fontWeight: 500 }}
               >
                 Your KYC
+              </Link>
+              <Link
+                to="/chat"
+                style={{ color: "var(--text-muted)", fontWeight: 500 }}
+              >
+                AI Compliance Chat
               </Link>
               <button
                 className="btn btn-outline"

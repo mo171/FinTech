@@ -16,19 +16,23 @@ import complianceRoutes from "./routes/compliance.routes.js";
 
 const app = express();
 
-// - BASIC MIDDLEWARES CONFIG 
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
-app.use(express.static("public"));
 // - CORS CONFIG -->  YOUR FRONT-END URL LIES HERE
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",") || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // Allow all origins for debugging
+      return callback(null, true);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
+
+// - BASIC MIDDLEWARES CONFIG
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+app.use(express.static("public"));
 
 // - ROUTING IS DONE HERE
 app.use("/api/inngest", inngestHandler);

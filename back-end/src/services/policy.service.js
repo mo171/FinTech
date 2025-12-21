@@ -113,12 +113,6 @@ export const evaluate = async (type, query, userId, conv) => {
       USER QUESTION:
       ${query}
 
-      ${
-        documentQuery
-          ? `DOCUMENT SEARCH GUIDANCE: Focus specifically on finding information related to: ${documentQuery}`
-          : ""
-      }
-
       DETAILED TASK:
       1. Thoroughly scan the "RELEVANT POLICY SNIPPETS" above.
       2. Determine if the user's question can be answered using ONLY these snippets.

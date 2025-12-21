@@ -1,8 +1,11 @@
 import { Shield, Clock, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useContext } from "react";
+import { UserContext } from "../context/UserContext";
 
 const Home = () => {
   const navigate = useNavigate();
+  const { user, setUser, loading } = useContext(UserContext);
 
   return (
     <div style={{ padding: "4rem 0" }}>
@@ -20,7 +23,7 @@ const Home = () => {
             lineHeight: 1.2,
           }}
         >
-          Welcome to Fintech KYC
+          Welcome to Fintech Solutions
         </h1>
         <p
           style={{
@@ -34,7 +37,29 @@ const Home = () => {
         >
           Secure and streamlined Know Your Customer verification platform
         </p>
-        <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+        {loading ? (
+            <span className="text-xs text-text-muted">Loading...</span>
+          ) : user ? (
+            <>
+             <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => navigate("/register")}
+          >
+            Chat with AI Compliance
+          </button>
+          <button
+            className="btn btn-outline"
+            onClick={() => navigate("/login")}
+          >
+            Your KYC
+          </button>
+        </div>
+            
+            </>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
           <button
             className="btn btn-primary"
             onClick={() => navigate("/register")}
@@ -48,6 +73,9 @@ const Home = () => {
             Sign In
           </button>
         </div>
+            </>
+          )}
+        
       </div>
 
       {/* Features Section */}

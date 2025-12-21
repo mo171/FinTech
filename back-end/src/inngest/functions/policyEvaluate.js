@@ -5,7 +5,6 @@
 import { inngest } from "../client.js";
 import { extractTextFromPDF } from "../../utils/pdfExtraction.js";
 import { chunkText, storePolicyChunks } from "../../services/chunks.service.js";
-import { getActivePolicy } from "../../services/databsesaving.service.js";
 
 export const policyEvaluate = inngest.createFunction(
   { name: "Policy Evaluation Workflow" },

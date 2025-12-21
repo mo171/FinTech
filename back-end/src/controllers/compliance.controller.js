@@ -31,7 +31,10 @@ const getData = async (input) => {
        "convo": convId(recived from backend) || "0"
       }
   */
-  const message = typeof input === "string" ? input : input.message;
+  const message =
+    typeof input === "string" ? input : input.message || input.content;
+  const convo =
+    typeof input === "string" ? "0" : input.convo || input.conv || "0";
   const rawInput = JSON.stringify({ message });
 
   const prompt = `
@@ -81,13 +84,14 @@ const getData = async (input) => {
 */
 const evaluateRequest = asyncHandler(async (req, res) => {
   try {
+    const { content, message, convo, conv } = req.body;
     const Data = await getData(req.body);
-    const conv = req.body.convo;
+    const activeConvo = convo || conv || "0";
     let { type, query } = Data;
 
     // TAKES THE CONVO IF NOT 0 AND INTEFIES TYPE  FROM DB
-    if (conv !== "0") {
-      const conversation = await getConversation(conv);
+    if (activeConvo !== "0") {
+      const conversation = await getConversation(activeConvo);
       if (conversation && conversation.policy_type) {
         type = conversation.policy_type; // * type is again reset from db
       }
@@ -102,7 +106,7 @@ const evaluateRequest = asyncHandler(async (req, res) => {
 
     // Delegate to service layer for evaluation logic (handles initial and follow-ups)
     // - HERE IS WHERE ALL THE BUSINESS LOGIC IS DONE
-    const result = await evaluate(type, query, req.user.id, conv);
+    const result = await evaluate(type, query, req.user.id, activeConvo);
 
     // RETURNING JSON RESPONSE TO FRONT-END
     return res
