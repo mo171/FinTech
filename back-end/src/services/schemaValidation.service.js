@@ -12,5 +12,5 @@ export const DecisionSchema = z.object({
 export const ExtractionSchema = z.object({
   type: z.string().nullable(),
   query: z.string(),
-  conv: z.string().default("0"),
+  conv: z.string().or(z.number()).transform(String).default("0"),
 });

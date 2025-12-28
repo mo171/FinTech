@@ -69,7 +69,14 @@ export const getActivePolicy = async (type) => {
     .limit(1)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === "PGRST116") {
+      throw new Error(
+        `No active policy found for type: "${type}". Please ensure this policy type exists in the database.`,
+      );
+    }
+    throw error;
+  }
   return data;
 };
 
