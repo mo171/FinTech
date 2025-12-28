@@ -72,19 +72,87 @@ export const formatChunks = (chunks) => {
  */
 export async function retrieveRelevantChunks(policyId, query) {
   try {
+    console.log(`🔍 RAG: Retrieving chunks for policy: ${policyId}`);
+    console.log(`🔍 RAG: Query: "${query}"`);
+
     // Generate embedding from the query text
     const queryEmbedding = await generateEmbedding(query);
+    console.log(
+      `✅ RAG: Query embedding generated (${queryEmbedding.length} dimensions)`,
+    );
 
+    // Try semantic search using RPC function
     const { data, error } = await supabaseAdmin.rpc("match_policy_chunks", {
-      policy_id: policyId,
+      p_policy_id: policyId,
       query_embedding: queryEmbedding,
       match_count: 5,
     });
 
-    if (error) throw error;
-    return data;
+    if (error) {
+      console.error("❌ RAG: RPC function error:", error);
+      console.log("⚠️ RAG: Falling back to retrieve all chunks...");
+
+      // Fallback: Get all chunks for this policy
+      const { data: allChunks, error: fallbackError } = await supabaseAdmin
+        .from("policy_chunks")
+        .select("*")
+        .eq("policy_id", policyId)
+        .order("chunk_index", { ascending: true });
+
+      if (fallbackError) throw fallbackError;
+
+      console.log(
+        `✅ RAG: Retrieved ${allChunks?.length || 0} chunks (fallback mode)`,
+      );
+
+      // Return all chunks with a default similarity score
+      return (
+        allChunks?.map((chunk) => ({
+          ...chunk,
+          similarity: 0.5, // Default similarity for fallback
+        })) || []
+      );
+    }
+
+    console.log(`✅ RAG: Semantic search returned ${data?.length || 0} chunks`);
+
+    if (data && data.length > 0) {
+      data.forEach((chunk, idx) => {
+        console.log(
+          `  📄 Chunk ${idx + 1}: similarity=${chunk.similarity?.toFixed(
+            3,
+          )}, preview="${chunk.content?.substring(0, 50)}..."`,
+        );
+      });
+      return data;
+    }
+
+    // If no results from semantic search, try fallback
+    console.log(
+      "⚠️ RAG: No chunks found via semantic search, trying fallback...",
+    );
+
+    const { data: allChunks, error: fallbackError } = await supabaseAdmin
+      .from("policy_chunks")
+      .select("*")
+      .eq("policy_id", policyId)
+      .order("chunk_index", { ascending: true });
+
+    if (fallbackError) throw fallbackError;
+
+    console.log(
+      `✅ RAG: Retrieved ${allChunks?.length || 0} chunks (fallback mode)`,
+    );
+
+    // Return all chunks with a default similarity score
+    return (
+      allChunks?.map((chunk) => ({
+        ...chunk,
+        similarity: 0.5, // Default similarity for fallback
+      })) || []
+    );
   } catch (error) {
-    console.error("Error retrieving relevant chunks:", error);
+    console.error("❌ RAG: Error retrieving relevant chunks:", error);
     throw error;
   }
 }

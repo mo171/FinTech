@@ -60,10 +60,16 @@ export const evaluate = async (type, query, userId, conv) => {
     // Retrieve relevant chunks via semantic search
     // uses rag approch to find relevent chunks for answering
     const policyChunks = await retrieveRelevantChunks(policy.id, query);
+    console.log(`📊 Retrieved ${policyChunks?.length || 0} chunks total`);
+
     const relevantContext = formatChunks(policyChunks);
+    console.log(
+      `📝 Formatted context length: ${relevantContext?.length || 0} characters`,
+    );
+    console.log(`📝 Context preview: ${relevantContext?.substring(0, 200)}...`);
 
     if (!relevantContext || relevantContext.trim().length === 0) {
-      console.warn("No relevant chunks found for the query.");
+      console.warn("⚠️ No relevant chunks found for the query.");
     }
 
     // * proccess of initilising / storing messages
@@ -93,37 +99,39 @@ export const evaluate = async (type, query, userId, conv) => {
     }
 
     const prompt = `
-      STRICT SYSTEM INSTRUCTIONS:
+      SYSTEM INSTRUCTIONS:
       ${systemInstruction}
       
-      CRITICAL RULE: Your response must be based ENTIRELY and EXCLUSIVELY on the "RELEVANT POLICY SNIPPETS" provided below. 
-      - If the answer is not in the snippets, state that the current policy information provided does not cover this and set status to "ACTION_REQUIRED".
-      - DO NOT use your internal general knowledge. Rely ONLY on the provided snippets.
-      - In the "explanation" and "response", you MUST reference or quote specific sections from the snippets.
+      IMPORTANT RULES:
+      - Base your response on the "RELEVANT POLICY SNIPPETS" provided below.
+      - If the user asks about what's IN the document (e.g., "is there lorem text?", "does it mention X?"), answer directly based on what you see in the snippets.
+      - For policy compliance questions, provide professional guidance based on the policy content.
+      - If the snippets don't contain enough information to answer a policy question, state that clearly and set status to "ACTION_REQUIRED".
+      - Quote specific sections from the snippets to support your answer.
 
       ${
         contextualHistory
-          ? `PREVIOUS CONTEXT (History of this conversation):\n${contextualHistory}\n`
+          ? `PREVIOUS CONTEXT (History of this conversation):\\n${contextualHistory}\\n`
           : ""
       }
 
-      RELEVANT POLICY SNIPPETS (The ONLY source of truth):
+      RELEVANT POLICY SNIPPETS:
       ${relevantContext || "No specific policy sections found for this query."}
 
       USER QUESTION:
       ${query}
 
-      DETAILED TASK:
-      1. Thoroughly scan the "RELEVANT POLICY SNIPPETS" above.
-      2. Determine if the user's question can be answered using ONLY these snippets.
-      3. Draft a response that sounds like a professional bank manager explaining these specific rules to a client. Use the exact terminology from the document.
-      4. Populate the "relevant_sections" array with verbatim quotes from the snippets that support your answer.
+      TASK:
+      1. Read the policy snippets above carefully.
+      2. If the user is asking about document content (e.g., "is there X in the document?"), answer YES or NO based on what you see.
+      3. If the user is asking a policy compliance question, provide professional guidance based on the policy.
+      4. Include relevant quotes from the snippets in the "relevant_sections" array.
+      5. Be helpful and direct in your response.
 
       OUTPUT RULES:
       - Return ONLY a valid JSON object.
       - Do NOT wrap in markdown or code blocks.
       - Ensure the JSON is directly parseable by JSON.parse().
-      - persona: Professional bank compliance manager. Human, empathetic, yet strictly rule-bound.
 
       JSON SCHEMA:
       {
