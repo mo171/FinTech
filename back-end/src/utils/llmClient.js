@@ -3,30 +3,37 @@
   - THIS IS THE LLM RESPONSE MODULE
   - BASIC CONFIG TO TO LLM
   - PROMPT AND REPLY DONE HERE
+  - THIS IS WHERE THE MAGIC HAPPENS
 */
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
+// - CONFIGURATION
 dotenv.config({ path: "./.env" });
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+/*
+ * takes in the prompt from services section triggered by controller
+ * sends it to openai and returns the response
+ * the llm model is handled here
+*/
 export const askLLM = async (prompt) => {
   try {
+
+    // GO THOUGH THIS
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini", // Cost-effective and fast model
       max_tokens: 4096,
       temperature: 0.7,
       messages: [{ role: "system", content: prompt }],
     });
-
+    // sending the response
     if (response.choices && response.choices[0]?.message?.content) {
       return response.choices[0].message.content;
     }
-
-    throw new Error("Empty response from OpenAI");
+    
   } catch (error) {
     console.error("OpenAI API Error Details:", {
       message: error.message,
@@ -36,6 +43,7 @@ export const askLLM = async (prompt) => {
     });
 
     // Handle specific OpenAI error cases
+    // no need to send this in production had to write it bcz was changing the api key again and again 🤣
     if (error.code === "invalid_api_key" || error.status === 401) {
       throw new Error(
         "OpenAI API Error: Invalid API Key. Please check your OPENAI_API_KEY in .env file",

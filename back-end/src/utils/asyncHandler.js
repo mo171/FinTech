@@ -7,6 +7,8 @@
   - If an error occurs during the execution of fn, it catches the error and sends a JSON response with a 500 status code, indicating an internal server error, along with the error message.
 
 */
+
+// if you are seeing this then better write the next async function with asyncHandler (yash)
 const asyncHandler = (fn) => async (req, res, next) => {
   try {
     return await fn(req, res, next);

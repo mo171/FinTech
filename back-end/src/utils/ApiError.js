@@ -1,5 +1,9 @@
-
-
+/*
+ * ApiError class
+ * used for sending error response
+ * can still use the normal error class but this is more structured
+ * and reminds you of which backend is sending that error
+ */
 
 class ApiError extends Error {
     constructor(

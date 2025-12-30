@@ -8,82 +8,67 @@
 
 */
 import { askLLM } from "../utils/llmClient.js";
-import { inngest } from "../inngest/client.js";
 import { DecisionSchema } from "./schemaValidation.service.js";
 import { retrieveRelevantChunks, formatChunks } from "./chunks.service.js";
 import {
-  getActivePolicy,
   createConversation,
   saveMessage,
-  getStoredPolicyText,
   getSaveMessages,
 } from "./databsesaving.service.js";
 
 // ----------------------- EVALUATION -------------------------
 
-export const evaluate = async (type, query, userId, conv) => {
+export const evaluate = async (query, userId, conv) => {
   try {
     // Validate required parameters
-    if (!type || !query || !userId) {
+    if (!query || !userId) {
       throw new Error(
-        "Missing required parameters: type, query, and userId are required",
+        "Missing required parameters: query and userId are required",
       );
     }
 
-    /*  
-       - GET ACTIVE POLICY IS FROM DB IS RETRIVED HERE
-       - THAT POLICY ID IS RECIVED AND CHECKS FOR EXSISTING CHUNKS OF THAT POLICY IN DB
-       - IF CHUNKS NOT CREATED THEN IS CREATED BY AUTO TRIGGERING INNGEST WORKFLOW 
-       - VECTOR EMBEDDING AND CHUNKS ARE STORED IN DB
-    */
-    const policy = await getActivePolicy(type);
-    let policyText = await getStoredPolicyText(policy.id);
-
-    if (!policyText) {
-      try {
-        // * Trigger inngest workflow to index this policy
-        await inngest.send({
-          name: "policy/evaluate",
-          data: { policy, query, userId, conv },
-        });
-
-        // Wait a bit or return immediate response?
-        // For now, we wait for a few seconds to let it process initial chunks
-        // or just advise user to wait.
-        // Better: throw a specific error or return status.
-      } catch (error) {
-        console.error("Error triggering Inngest indexing:", error);
-        throw error;
-      }
-    }
-
-    // Retrieve relevant chunks via semantic search
-    // uses rag approch to find relevent chunks for answering
-    const policyChunks = await retrieveRelevantChunks(policy.id, query);
-    console.log(`📊 Retrieved ${policyChunks?.length || 0} chunks total`);
+    // Retrieve relevant chunks via global semantic search
+    // This now searches across all policies in the database
+    const policyChunks = await retrieveRelevantChunks(query);
+    console.log(`📊 Retrival: Found ${policyChunks?.length || 0} chunks total`);
 
     const relevantContext = formatChunks(policyChunks);
     console.log(
-      `📝 Formatted context length: ${relevantContext?.length || 0} characters`,
+      `📝 Context: Formatted length ${relevantContext?.length || 0} characters`,
     );
-    console.log(`📝 Context preview: ${relevantContext?.substring(0, 200)}...`);
 
-    if (!relevantContext || relevantContext.trim().length === 0) {
-      console.warn("⚠️ No relevant chunks found for the query.");
-    }
-
-    // * proccess of initilising / storing messages
-    // * message are stored to db bcz llm are state less therfore for understanding what happend in previous convo its nessecary
+    // * process of initialising / storing messages
     let conversation;
     let systemInstruction =
       "You are a bank compliance expert analyzing policy documents.";
     let contextualHistory = "";
+    let detectedPolicyId = null;
 
-    const normalizedConv = typeof conv === "string" ? conv.trim() : conv; // convo is in the form of big-uuid therefore cleaning it
+    const normalizedConv = typeof conv === "string" ? conv.trim() : conv;
 
     if (normalizedConv === "0") {
-      conversation = await createConversation(userId, policy);
+      // FOR NEW CONVERSATIONS:
+      // Identify the most relevant policy from the search results
+      if (policyChunks && policyChunks.length > 0) {
+        detectedPolicyId = policyChunks[0].policy_id;
+        console.log(
+          `🎯 Auto-Detection: Identified policy ID ${detectedPolicyId}`,
+        );
+      } else {
+        console.warn("⚠️ No relevant policy identified from query.");
+        // Fallback or handle case where no chunks are found
+        // We'll create a conversation with a null policy or a default one if necessary,
+        // llm will send the dedicated response if it happens
+      }
+
+      // Create a conversation. If detectedPolicyId is null, we might need to handle this.
+      // Assuming createConversation can handle a null policy.
+      // If we don't have a policy, we might want to still create a conversation
+      // to track the history.
+      const policyStub = detectedPolicyId ? { id: detectedPolicyId } : null;
+      conversation = await createConversation(userId, policyStub);
     } else {
+      // FOR EXISTING CONVERSATIONS:
       conversation = { id: normalizedConv };
       const messages = await getSaveMessages(conversation.id);
 
@@ -97,17 +82,25 @@ export const evaluate = async (type, query, userId, conv) => {
           "\nThis is a follow-up session. Use the previous context below to inform your answer.";
       }
     }
+    /*
+     - THE PROMPT NEEDS TO BE UPDATED BASED ON THE NEW REQUIREMENTS
+     - LIKE IF THE USER ASKED ABOUT THE POLICY THAT HAS THIS TEXT OR DEALS WITH THIS THEN 
+     - THEN RETURN RESPONSE IF RELEVENT CHUNKS ARE NOT RETRIVED THEN 
+     - ALSO USING A LOT OF CONTEXTUAL HISTORIES I WANT HI TO LIVE IN THE CONVERSATION
 
+    */
     const prompt = `
       SYSTEM INSTRUCTIONS:
       ${systemInstruction}
       
       IMPORTANT RULES:
       - Base your response on the "RELEVANT POLICY SNIPPETS" provided below.
+      - These snippets are retrieved from our database across various bank policies.
       - If the user asks about what's IN the document (e.g., "is there lorem text?", "does it mention X?"), answer directly based on what you see in the snippets.
-      - For policy compliance questions, provide professional guidance based on the policy content.
-      - If the snippets don't contain enough information to answer a policy question, state that clearly and set status to "ACTION_REQUIRED".
+      - For policy compliance questions, provide professional guidance based on the snippets.
+      - If multiple policies are mentioned in snippets, integrate the information if relevant.
       - Quote specific sections from the snippets to support your answer.
+      - IF NO RELEVANT SNIPPETS ARE PROVIDED: Explicitly state that no relevant information was found in our database for this query. Do not attempt to guess or use outside knowledge.
 
       ${
         contextualHistory
@@ -124,9 +117,9 @@ export const evaluate = async (type, query, userId, conv) => {
       TASK:
       1. Read the policy snippets above carefully.
       2. If the user is asking about document content (e.g., "is there X in the document?"), answer YES or NO based on what you see.
-      3. If the user is asking a policy compliance question, provide professional guidance based on the policy.
-      4. Include relevant quotes from the snippets in the "relevant_sections" array.
-      5. Be helpful and direct in your response.
+      3. If no snippets are present, respond stating "No similar policy or relevant information found in our database for this query."
+      4. Include relevant quotes from the snippets in the "relevant_sections" array (leave empty if no snippets).
+      5. Be helpful and direct in your response, sounding like a professional bank compliance manager.
 
       OUTPUT RULES:
       - Return ONLY a valid JSON object.
@@ -135,11 +128,8 @@ export const evaluate = async (type, query, userId, conv) => {
 
       JSON SCHEMA:
       {
-        "status": "APPROVED" | "REJECTED" | "ACTION_REQUIRED",
-        "explanation": "A detailed technical explanation citing specific policy rules for internal banking records.",
         "relevant_sections": ["list of verbatim quotes from the policy text"],
-        "recommendation": "A concise actionable step for the bank staff.",
-        "response": "A human-friendly explanation for the customer, sounding like a bank manager, explaining what the policy says about their query.",
+        "response": "A human-friendly explanation for the customer, explaining what the policy says about their query.",
         "responseforfurtherllm": "A concise summary of this turn for your own memory to maintain context in future messages."
       }
     `;
@@ -157,8 +147,6 @@ export const evaluate = async (type, query, userId, conv) => {
       console.error("Parsing/Validation Error:", err, llmRawResponse);
       // Fallback for non-JSON responses or schema mismatches
       parsedDecision = {
-        status: "ACTION_REQUIRED",
-        explanation: "The assistant response was not in the expected format.",
         relevant_sections: [],
         recommendation: "Please review the response manually.",
         response: llmRawResponse,

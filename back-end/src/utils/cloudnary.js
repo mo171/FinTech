@@ -1,4 +1,8 @@
-// Require the cloudinary library
+/*
+ * cloudinary config
+ * used for image storage
+ * kept it for futre use
+ */
 import { v2 as cloudinary } from "cloudinary";
 import fs from "fs";
 

@@ -1,70 +1,61 @@
 /*
-  - THE SECOND MOST CRUCIAL MODULE OF BACKEND
-  - COMPLIANCE CHAPT-BOT SERVICES AND BUSSINIESS LOGIC ARE ARE BROUGHT HERE
-  - THIS IS THE PLACE WHERE FRONT-END INFO IS RECIVED AND DECONTRUCTED 
-*/
+ * COMPLIANCE CONTROLLER
+ * This is the primary entry point for all compliance-related chat interactions.
+ * It handles:
+ * - Receiving natural language queries from the frontend.
+ * - Authenticating the request (via middleware).
+ * - Delegating business logic to the policy service.
+ * - Returning structured JSON responses to the frontend.
+ */
 
-//IMPORT
-import { evaluate } from "../services/policy.service.js"; // * name is not that correct but initalize chat- retrives data from db
-import { askLLM } from "../utils/llmClient.js"; // * for proccesing of json data recived from front-end
-import { getConversation } from "../services/databsesaving.service.js"; // * for getting conversation from db
+// - IMPORTS
+import { evaluate } from "../services/policy.service.js";
+import { getConversation } from "../services/databsesaving.service.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { ExtractionSchema } from "../services/schemaValidation.service.js";
 
-/*  
-  - TAKES THE JSON RESPONSE FROM FRONTEND
-  - SEND JSON RESPONSE TO BACKEND
-  - RESPONSE FORMAT 
-    - {
-      "type": string * the type shuld be type_policy thats how its stored in db
-      "query": string, * user query over that policy
-      "conv": string * conversation id if not comes from frontend creates new one 
-      }
-*/
+/**
+ * getData (Utility)
+ * Historically used to structure incoming data.
+ * Note: Currently logic is mostly handled directly in the controller or service.
+ */
 const getData = async (input) => {
-  // Check if input already has structured fields (type, query, conv)
-  // If so, skip LLM processing and return directly
   if (typeof input === "object" && input.type !== undefined && input.query) {
     const conv = input.conv || input.convo || "0";
     return {
       type: input.type,
       query: input.query,
-      conv: String(conv), // Ensure it's a string
+      conv: String(conv),
     };
   }
 };
 
-/* 
-  - THIS CONTROLLERS BRING EVERY MODULE AND ASPECTS TOGETHER
-  - PROCESS INFO AND SEND JSON RESPONSE TO FRONT-END
-*/
+/**
+ * evaluateRequest
+ * CORE CONTROLLER FUNCTION
+ * 1. Extracts query and convo ID from request body.
+ * 2. Validates basic requirements.
+ * 3. Triggers the semantic search and LLM logic via evaluate service.
+ * 4. Sends the final recommendation and response back to the client.
+ */
 const evaluateRequest = asyncHandler(async (req, res) => {
   try {
-    const { type, query, convo, conv } = req.body;
-    const activeConvo = convo || conv || "0";
-    console.log(activeConvo);
+    const { query, convo } = req.body;
+    const userId = req.user.id; // Populated by requireAuth middleware
+    const activeConvo = convo || "0";
 
-    // TAKES THE CONVO IF NOT 0 AND INTEFIES TYPE  FROM DB
-    if (activeConvo !== "0") {
-      const conversation = await getConversation(activeConvo);
-      if (conversation && conversation.policy_type) {
-        type = conversation.policy_type; // * type is again reset from db
-      }
-    }
-
-    // Basic validation
-    if (!type || !query) {
+    // - BASIC VALIDATION
+    if (!query) {
       return res.status(400).json({
-        error: "Missing required fields: type and query are required",
+        error: "Missing required field: query is required",
       });
     }
 
-    // Delegate to service layer for evaluation logic (handles initial and follow-ups)
-    // - HERE IS WHERE ALL THE BUSINESS LOGIC IS DONE
-    const result = await evaluate(type, query, req.user.id, activeConvo);
+    // - BUSINESS LOGIC DELEGATION
+    // The service now handles auto-detection of policies based on user query
+    const result = await evaluate(query, userId, activeConvo);
 
-    // RETURNING JSON RESPONSE TO FRONT-END
+    // - SUCCESS RESPONSE
     return res
       .status(200)
       .json(

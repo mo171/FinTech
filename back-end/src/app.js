@@ -38,9 +38,5 @@ app.use(express.static("public"));
 app.use("/api/inngest", inngestHandler);
 app.use("/api/compliance", complianceRoutes);
 
-// - DEFAULT ROUTE
-app.get("/", (req, res) => {
-  res.send("Finn-tech connected");
-});
 
 export default app;

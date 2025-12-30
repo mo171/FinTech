@@ -1,12 +1,25 @@
+/*
+ * DATABASE SAVING SERVICE
+ * Responsible for all direct interactions with Supabase tables related to chat and policies.
+ * Handles:
+ * - Conversation creation and retrieval
+ * - Message persistence (Role-based: user/assistant)
+ * - Policy text and status lookups
+ */
 import { supabaseAdmin } from "../utils/supabase.js";
 
+/**
+ * createConversation
+ * Initializes a new chat session for a user.
+ * Links the conversation to a specific policy if identified.
+ */
 export const createConversation = async (userId, policy) => {
   const { data, error } = await supabaseAdmin
     .from("conversations")
     .insert({
       user_id: userId,
-      policy_id: policy.id,
-      policy_type: policy.policy_type,
+      policy_id: policy ? policy.id : null,
+      policy_type: policy ? policy.policy_type : null,
       status: "active",
     })
     .select()
@@ -16,6 +29,10 @@ export const createConversation = async (userId, policy) => {
   return data;
 };
 
+/**
+ * getConversation
+ * Fetches conversation details by ID.
+ */
 export const getConversation = async (conversationId) => {
   const { data, error } = await supabaseAdmin
     .from("conversations")
@@ -27,6 +44,10 @@ export const getConversation = async (conversationId) => {
   return data;
 };
 
+/**
+ * saveMessage
+ * Records an individual chat message (User or AI) in the DB.
+ */
 export const saveMessage = async ({ conversationId, role, content }) => {
   const { error } = await supabaseAdmin.from("messages").insert({
     conversation_id: conversationId,
@@ -37,6 +58,10 @@ export const saveMessage = async ({ conversationId, role, content }) => {
   if (error) throw error;
 };
 
+/**
+ * getStoredPolicyText
+ * Retrieves the raw text content of a policy document from chunks (used for indexing check).
+ */
 export const getStoredPolicyText = async (policyId) => {
   const { data, error } = await supabaseAdmin
     .from("policy_chunks")
@@ -49,6 +74,10 @@ export const getStoredPolicyText = async (policyId) => {
   return data.length > 0 ? data[0].content : null;
 };
 
+/**
+ * storePolicyText
+ * (Legacy/Utility) Stores raw text for a policy document.
+ */
 export const storePolicyText = async (policy, rawText) => {
   const { error } = await supabaseAdmin.from("policy_documents_text").insert({
     policy_id: policy.id,
@@ -60,6 +89,10 @@ export const storePolicyText = async (policy, rawText) => {
   if (error) throw error;
 };
 
+/**
+ * getActivePolicy
+ * Finds the latest version of a specific policy type.
+ */
 export const getActivePolicy = async (type) => {
   const { data, error } = await supabaseAdmin
     .from("policies")
@@ -80,6 +113,10 @@ export const getActivePolicy = async (type) => {
   return data;
 };
 
+/**
+ * getSaveMessages
+ * Retrieves the message history for a conversation to provide context to the LLM.
+ */
 export const getSaveMessages = async (conversationId) => {
   const { data, error } = await supabaseAdmin
     .from("messages")

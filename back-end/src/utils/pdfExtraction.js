@@ -1,6 +1,7 @@
 /* 
   - TAKES PDF-URL FROM DATA-BASE
   - PROCCESS THE PDF AND GIVES TEXT
+  - CAN FIND A BETTER WAY TO DO IT PUT IT HERE 
 */
 import pdf from "pdf-parse";
 

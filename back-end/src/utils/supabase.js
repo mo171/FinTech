@@ -1,5 +1,6 @@
 /* 
   - SUPABASE IS INITILISED HERE
+  - IF YOU ARE READING THIS YOU BETTER GO THROUGH SUPABSE DOCS 
 */
 
 import { createClient } from "@supabase/supabase-js";
@@ -18,5 +19,6 @@ if (!supabaseUrl || !supabaseKey) {
 } else {
   console.log("Supabase initialized successfully with credentials.");
 }
+
 // - THE SUPABASE ADMIN WILL BE RESPONSIBLE TO FETCH DATA FROM BACKEND OR TO UPDATE DATA IN DATABASE
 export const supabaseAdmin = createClient(supabaseUrl, supabaseKey);

@@ -1,6 +1,18 @@
+/*
+ * POLICY CHUNKING & SEMANTIC SEARCH SERVICE
+ * This service handles the "RAG" (Retrieval Augmented Generation) logic:
+ * - Splitting large policy documents into searchable chunks.
+ * - Storing chunks with vector embeddings in the DB.
+ * - Performing global vector searches to find relevant context for user queries.
+ */
 import { supabaseAdmin } from "../utils/supabase.js";
 import { generateEmbedding } from "./embedding.service.js";
 
+/**
+ * chunkText
+ * Splits raw policy text into smaller segments based on word count.
+ * Ensures the LLM doesn't exceed context limits and search stays granular.
+ */
 export const chunkText = (text, maxWords = 200) => {
   const sentences = text.split(". ");
   const chunks = [];
@@ -30,9 +42,15 @@ export const chunkText = (text, maxWords = 200) => {
   return chunks;
 };
 
+/**
+ * storePolicyChunks
+ * Generates embeddings for each chunk and saves them to Supabase.
+ * This is typically triggered after a new PDF is uploaded.
+ */
 export const storePolicyChunks = async (policyId, chunks) => {
   try {
     for (const chunk of chunks) {
+      // - Generate vector embedding for this specific chunk
       const embedding = await generateEmbedding(chunk.content);
 
       const { error } = await supabaseAdmin.from("policy_chunks").insert({
@@ -41,6 +59,7 @@ export const storePolicyChunks = async (policyId, chunks) => {
         content: chunk.content,
         embedding,
       });
+
       console.log(`Chunk ${chunk.chunk_index} stored successfully`);
 
       if (error) {
@@ -55,6 +74,11 @@ export const storePolicyChunks = async (policyId, chunks) => {
   }
 };
 
+/**
+ * formatChunks
+ * Prepares the retrieved database chunks for the LLM prompt.
+ * Adds metadata like section index and similarity scores.
+ */
 export const formatChunks = (chunks) => {
   return chunks
     .map(
@@ -67,51 +91,32 @@ export const formatChunks = (chunks) => {
 };
 
 /**
- * Retrieve relevant chunks for a given policy and query
- * Generates embedding from query text and performs semantic search
+ * retrieveRelevantChunks
+ * THE CORE OF THE SEARCH SYSTEM.
+ * 1. Converts user query to an embedding.
+ * 2. Calls the 'match_all_policy_chunks' RPC to find the most similar text segments.
+ * 3. Returns a list of relevant snippets and their parent policy IDs.
  */
-export async function retrieveRelevantChunks(policyId, query) {
+export async function retrieveRelevantChunks(query) {
   try {
-    console.log(`🔍 RAG: Retrieving chunks for policy: ${policyId}`);
-    console.log(`🔍 RAG: Query: "${query}"`);
+    console.log(`🔍 RAG: Retrieving relevant chunks for query: "${query}"`);
 
-    // Generate embedding from the query text
+    // - Generate query embedding
     const queryEmbedding = await generateEmbedding(query);
     console.log(
       `✅ RAG: Query embedding generated (${queryEmbedding.length} dimensions)`,
     );
 
-    // Try semantic search using RPC function
-    const { data, error } = await supabaseAdmin.rpc("match_policy_chunks", {
-      p_policy_id: policyId,
+    // - Perform global semantic search using Supabase RPC
+    const { data, error } = await supabaseAdmin.rpc("match_all_policy_chunks", {
       query_embedding: queryEmbedding,
       match_count: 5,
     });
 
     if (error) {
       console.error("❌ RAG: RPC function error:", error);
-      console.log("⚠️ RAG: Falling back to retrieve all chunks...");
-
-      // Fallback: Get all chunks for this policy
-      const { data: allChunks, error: fallbackError } = await supabaseAdmin
-        .from("policy_chunks")
-        .select("*")
-        .eq("policy_id", policyId)
-        .order("chunk_index", { ascending: true });
-
-      if (fallbackError) throw fallbackError;
-
-      console.log(
-        `✅ RAG: Retrieved ${allChunks?.length || 0} chunks (fallback mode)`,
-      );
-
-      // Return all chunks with a default similarity score
-      return (
-        allChunks?.map((chunk) => ({
-          ...chunk,
-          similarity: 0.5, // Default similarity for fallback
-        })) || []
-      );
+      console.log("⚠️ RAG: Global semantic search failed.");
+      return [];
     }
 
     console.log(`✅ RAG: Semantic search returned ${data?.length || 0} chunks`);
@@ -119,7 +124,9 @@ export async function retrieveRelevantChunks(policyId, query) {
     if (data && data.length > 0) {
       data.forEach((chunk, idx) => {
         console.log(
-          `  📄 Chunk ${idx + 1}: similarity=${chunk.similarity?.toFixed(
+          `  📄 Chunk ${idx + 1}: [Policy: ${
+            chunk.policy_id
+          }] similarity=${chunk.similarity?.toFixed(
             3,
           )}, preview="${chunk.content?.substring(0, 50)}..."`,
         );
@@ -127,30 +134,9 @@ export async function retrieveRelevantChunks(policyId, query) {
       return data;
     }
 
-    // If no results from semantic search, try fallback
-    console.log(
-      "⚠️ RAG: No chunks found via semantic search, trying fallback...",
-    );
-
-    const { data: allChunks, error: fallbackError } = await supabaseAdmin
-      .from("policy_chunks")
-      .select("*")
-      .eq("policy_id", policyId)
-      .order("chunk_index", { ascending: true });
-
-    if (fallbackError) throw fallbackError;
-
-    console.log(
-      `✅ RAG: Retrieved ${allChunks?.length || 0} chunks (fallback mode)`,
-    );
-
-    // Return all chunks with a default similarity score
-    return (
-      allChunks?.map((chunk) => ({
-        ...chunk,
-        similarity: 0.5, // Default similarity for fallback
-      })) || []
-    );
+    // - Return empty if no relevant snippets are found
+    console.log("⚠️ RAG: No relevant chunks found via semantic search.");
+    return [];
   } catch (error) {
     console.error("❌ RAG: Error retrieving relevant chunks:", error);
     throw error;
